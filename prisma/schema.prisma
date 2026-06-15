@@ -1,0 +1,144 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  RESTAURANT_ADMIN
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model Tenant {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String    @unique
+  settings  Json?
+  isActive  Boolean   @default(true)
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  users      User[]
+  categories Category[]
+  menuItems  MenuItem[]
+  orders     Order[]
+  orderItems OrderItem[]
+
+  @@index([isActive])
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(STAFF)
+  
+  tenantId     String?
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id])
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? // Soft delete
+
+  @@index([tenantId, email])
+}
+
+model Category {
+  id           String    @id @default(uuid())
+  name         String
+  translations Json?     // e.g., { "en": "Desserts", "fa": "دسرها", "ar": "حلويات" }
+  sortOrder    Int       @default(0)
+  
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  
+  menuItems    MenuItem[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  @@index([tenantId, sortOrder])
+}
+
+model MenuItem {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  imageKey    String?
+  isAvailable Boolean   @default(true)
+  
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  
+  orderItems  OrderItem[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([tenantId, categoryId])
+  @@index([tenantId, isAvailable])
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String
+  tableNumber String?
+  status      OrderStatus @default(PENDING)
+  totalAmount Float
+  
+  tenantId    String
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  
+  orderItems  OrderItem[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model OrderItem {
+  id         String    @id @default(uuid())
+  quantity   Int
+  notes      String?
+  
+  orderId    String
+  order      Order     @relation(fields: [orderId], references: [id])
+  
+  menuItemId String
+  menuItem   MenuItem  @relation(fields: [menuItemId], references: [id])
+
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, menuItemId])
+}
